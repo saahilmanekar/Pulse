@@ -1,0 +1,29 @@
+# This is the "contract" between Pulse and a training script.
+# The user's training script must accept these as command-line flags.
+
+command: "python examples/toy_cnn_train.py"
+
+# Each parameter Pulse is allowed to test/tune, and the CLI flag it maps to.
+parameters:
+  batch_size:
+    flag: "--batch-size"
+    default: 32
+    candidates: [32, 64, 128]
+
+  num_workers:
+    flag: "--num-workers"
+    default: 0
+    candidates: [0, 2, 4]
+
+  amp:
+    flag: "--amp"
+    default: false
+    candidates: [false, true]
+
+# Where the script writes/reads checkpoints (needed later for pause/resume)
+checkpoint_path: "./checkpoints/toy_cnn.pt"
+
+# Safety limits for any short benchmark trial Pulse runs
+constraints:
+  max_trial_seconds: 60
+  max_gpu_memory_gb: null   # null = not enforced yet, fill in once you have a GPU to test on
