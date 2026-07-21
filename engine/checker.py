@@ -33,3 +33,13 @@ def find_dataloader_calls(tree):
                 dataloader_calls.append(node)
 
     return dataloader_calls
+
+def get_keyword_value_from_call_node(call_node, keyword_name):
+    """Given a Call node, find the value passed for a specific keyword"""
+
+    # eg: batch_size=32 should return 32
+
+    for keyword in call_node.keywords:
+        if keyword.arg == keyword_name:
+            return keyword.value
+    return None
