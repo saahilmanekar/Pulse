@@ -37,9 +37,22 @@ def find_dataloader_calls(tree):
 def get_keyword_value_from_call_node(call_node, keyword_name):
     """Given a Call node, find the value passed for a specific keyword"""
 
-    # eg: batch_size=32 should return 32
+    # eg: batch_size=32 should return a form of 32
 
     for keyword in call_node.keywords:
         if keyword.arg == keyword_name:
             return keyword.value
     return None
+
+def literal_or_none(node):
+    """Attempts to read a plain literal value (eg: 0, 32, True) from ast node"""
+
+    # Previous function gives us back raw ast node, not the actual literal value like 32
+
+    if node is None:
+        return None
+
+    try:
+        return ast.literal_eval(node)
+    except (ValueError, TypeError):
+        return None
