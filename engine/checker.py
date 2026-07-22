@@ -56,3 +56,22 @@ def literal_or_none(node):
         return ast.literal_eval(node)
     except (ValueError, TypeError):
         return None
+
+def check_num_workers(tree):
+    """Check all DataLoader calls for a missing or zero num_workers"""
+
+    findings = []
+
+    for call_node in find_dataloader_calls(tree):
+        num_workers_node = get_keyword_value_from_call_node(call_node, "num_workers")
+        num_workers_value = literal_or_none(num_workers_node)
+
+        if num_workers_node is None or num_workers_value == 0:
+            findings.append({
+
+                # .lineno provides the line it was written in the source file
+                "line": call_node.lineno,
+                "message": "num_workers is missing or set to 0. Data loads on a single process, which can leave the GPU waiting. Worth testing higher values (eg: 2,4,8) to see what's fastest for your specific setup."
+            })
+
+    return findings
