@@ -137,7 +137,6 @@ def check_excessive_logging(tree):
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.For, ast.While)):
-            
             for child in ast.walk(node):
                 if isinstance(child, ast.Call):
                     func_name = get_call_name(child.func)
@@ -146,6 +145,27 @@ def check_excessive_logging(tree):
                             "line": child.lineno,
                             "message": "print() call found inside a loop. Printing every step can add overhead, especially if it forces GPU synchronization (eg: printing a .item() value). Consider printing every N steps instead."
                         })
+    return findings
+
+def check_gpu_cpu_sync(tree):
+    """Flag .item(), .cpu(), .numpy() calls found inside a training loop"""
+
+    findings = []
+
+    sync_method_names = {"item", "cpu", "numpy"}
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.For, ast.While)):
+            for child in ast.walk(node):
+                if isinstance(child, ast.Call):
+                    func_name = get_call_name(child.func)
+                    
+                    if func_name and func_name.split(".")[-1] in sync_method_names:
+                        findings.append({
+                            "line": child.lineno,
+                            "message": f"'.{func_name.split('.')[-1]}()' call found inside a loop. This forces the GPU to stop and sync with the CPU, which can add up if called every step. Consider calling it less frequently or accumulating values on the GPU instead."
+                        })
+
     return findings
 
 # Final function that ties everything together
@@ -162,10 +182,12 @@ def run_static_check(filepath):
     pin_memory_findings = check_pin_memory(tree)
     amp_usage_findings = check_amp_usage(source_code)
     excessive_logging_findings = check_excessive_logging(tree)
+    check_gpu_cpu_sync_findings = check_gpu_cpu_sync(tree)
 
     all_findings += num_workers_findings
     all_findings += pin_memory_findings
     all_findings += amp_usage_findings
     all_findings += excessive_logging_findings
+    all_findings += check_gpu_cpu_sync_findings
 
     return all_findings
