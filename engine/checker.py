@@ -57,6 +57,8 @@ def literal_or_none(node):
     except (ValueError, TypeError):
         return None
 
+# Check SPECIFIC rules/attributes using the ABOVE helper functions
+
 def check_num_workers(tree):
     """Check all DataLoader calls for a missing or zero num_workers"""
 
@@ -72,6 +74,23 @@ def check_num_workers(tree):
                 # .lineno provides the line it was written in the source file
                 "line": call_node.lineno,
                 "message": "num_workers is missing or set to 0. Data loads on a single process, which can leave the GPU waiting. Worth testing higher values (eg: 2,4,8) to see what's fastest for your specific setup."
+            })
+
+    return findings
+
+def check_pin_memory(tree):
+    """Check all DataLoader calls for a missing or False pin_memory"""
+
+    findings = []
+
+    for call_node in find_dataloader_calls(tree):
+        pin_memory_node = get_keyword_value_from_call_node(call_node, "pin_memory")
+        pin_memory_value = literal_or_none(pin_memory_node)
+
+        if pin_memory_node is None or pin_memory_value is False:
+            findings.append({
+                "line": call_node.lineno,
+                "message": "pin_memory is missing or set to False. If you're using a GPU, this usually speeds up moving data from CPU to GPU at little to no cost. Worth testing pin_memory=True."
             })
 
     return findings
