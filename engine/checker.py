@@ -15,6 +15,26 @@ def parse_source(source_code):
     # converts code into tree object where Python figures our structure
     return ast.parse(source_code) 
 
+def get_call_name(func_node):
+    """Return the full name of the function being called"""
+
+    # If the func_node has a plain name with no dots, just grab the text (.id)
+    if isinstance(func_node, ast.Name):
+        return func_node.id
+
+    # Recursively call the function in case there is a dot
+    elif isinstance(func_node, ast.Attribute):
+
+        # Pass in everything to the left of the last dot
+        parent_name = get_call_name(func_node.value)
+
+        if parent_name:
+            return f"{parent_name}.{func_node.attr}"
+        else:
+            return func_node.attr
+
+    return None
+
 def find_dataloader_calls(tree):
     """Walk the tree and find all DataLoader(...) calls"""
 
@@ -25,11 +45,11 @@ def find_dataloader_calls(tree):
 
         # ast.Call: node that Python creates whenever code calls a function/method
         if isinstance(node, ast.Call):
-        
-            # Tries to get "id" from node.func but returns None if it crashes
-            func_name = getattr(node.func, "id", None) 
 
-            if func_name == "DataLoader":
+            # Tries to get the actual name of the function using the helper function
+            func_name = get_call_name(node.func)
+
+            if func_name == "DataLoader" or (func_name and func_name.endswith(".DataLoader")):
                 dataloader_calls.append(node)
 
     return dataloader_calls
@@ -100,6 +120,8 @@ def check_amp_usage(source_code):
 
     findings = []
 
+    # Check directly in source code
+
     if "autocast" not in source_code and "GradScaler" not in source_code:
         findings.append({
             "line": 1,
@@ -118,7 +140,7 @@ def check_excessive_logging(tree):
             
             for child in ast.walk(node):
                 if isinstance(child, ast.Call):
-                    func_name = getattr(child.func, "id", None)
+                    func_name = get_call_name(child.func)
                     if func_name == "print":
                         findings.append({
                             "line": child.lineno,
