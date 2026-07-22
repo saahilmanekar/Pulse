@@ -125,3 +125,25 @@ def check_excessive_logging(tree):
                             "message": "print() call found inside a loop. Printing every step can add overhead, especially if it forces GPU synchronization (eg: printing a .item() value). Consider printing every N steps instead."
                         })
     return findings
+
+# Final function that ties everything together
+
+def run_static_check(filepath):
+    """Run all checks against a file and return the combined findings"""
+
+    source_code = read_source(filepath)
+    tree = parse_source(source_code)
+
+    all_findings = []
+
+    num_workers_findings = check_num_workers(tree)
+    pin_memory_findings = check_pin_memory(tree)
+    amp_usage_findings = check_amp_usage(source_code)
+    excessive_logging_findings = check_excessive_logging(tree)
+
+    all_findings += num_workers_findings
+    all_findings += pin_memory_findings
+    all_findings += amp_usage_findings
+    all_findings += excessive_logging_findings
+
+    return all_findings
