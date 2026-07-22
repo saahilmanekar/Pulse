@@ -94,3 +94,16 @@ def check_pin_memory(tree):
             })
 
     return findings
+
+def check_amp_usage(source_code):
+    """Check whether mixed precision (autocast/GradScaler) appears anywhere in the file"""
+
+    findings = []
+
+    if "autocast" not in source_code and "GradScaler" not in source_code:
+        findings.append({
+            "line": 1,
+            "message": "No sign of mixed precision (autocast/GradScaler) anywhere in this file. On a compatible GPU, this often speeds up training with minimal accuracy impact, worth testing."
+        })
+
+    return findings
