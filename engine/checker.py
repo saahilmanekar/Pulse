@@ -107,3 +107,21 @@ def check_amp_usage(source_code):
         })
 
     return findings
+
+def check_excessive_logging(tree):
+    """Flag print() calls found inside a training loop (for/while)"""
+    
+    findings = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.For, ast.While)):
+            
+            for child in ast.walk(node):
+                if isinstance(child, ast.Call):
+                    func_name = getattr(child.func, "id", None)
+                    if func_name == "print":
+                        findings.append({
+                            "line": child.lineno,
+                            "message": "print() call found inside a loop. Printing every step can add overhead, especially if it forces GPU synchronization (eg: printing a .item() value). Consider printing every N steps instead."
+                        })
+    return findings
