@@ -168,6 +168,23 @@ def check_gpu_cpu_sync(tree):
 
     return findings
 
+def check_checkpoint_in_loop(tree):
+    """Flag torch.save(...) calls found inside a training loop"""
+
+    findings = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.For, ast.While)):
+            for child in ast.walk(node):
+                if isinstance(child, ast.Call):
+                    func_name = get_call_name(child.func)
+                    if func_name == "torch.save":
+                        findings.append({
+                            "line": child.lineno,
+                            "message": "torch.save() call found inside a loop. Saving a checkpoint every step can add significant disk I/O overhead. Consider checkpointing every N steps or once per epoch instead."
+                        })
+    return findings
+
 # Final function that ties everything together
 
 def run_static_check(filepath):
@@ -183,11 +200,13 @@ def run_static_check(filepath):
     amp_usage_findings = check_amp_usage(source_code)
     excessive_logging_findings = check_excessive_logging(tree)
     check_gpu_cpu_sync_findings = check_gpu_cpu_sync(tree)
+    check_checkpoint_in_loop_findings = check_checkpoint_in_loop(tree)
 
     all_findings += num_workers_findings
     all_findings += pin_memory_findings
     all_findings += amp_usage_findings
     all_findings += excessive_logging_findings
     all_findings += check_gpu_cpu_sync_findings
+    all_findings += check_checkpoint_in_loop_findings
 
     return all_findings
