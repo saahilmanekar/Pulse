@@ -232,6 +232,26 @@ def check_non_blocking_transfer(tree):
                             })
     return findings
 
+def check_tunable_hyperparameters(tree):
+    """Check whether key DataLoader settings are hardcoded"""
+
+    findings = []
+
+    keywords_to_check = {"num_workers", "batch_size", "pin_memory", "persistent_workers"}
+
+    for call_node in find_dataloader_calls(tree):
+        for keyword_name in keywords_to_check:
+            value_node = get_keyword_value_from_call_node(call_node, keyword_name)
+            value = literal_or_none(value_node)
+
+            if value_node is not None and value is not None:
+                findings.append({
+                    "line": call_node.lineno,
+                    "message": f"{keyword_name}={value} is hardcoded. Pulse can't test alternative values for this unless it's exposed as a command-line argument, eg: change this to {keyword_name}=args.{keyword_name} and add a corresponding argparse argument."
+                })
+
+    return findings
+
 # Final function that ties everything together
 
 def run_static_check(filepath):
@@ -250,6 +270,7 @@ def run_static_check(filepath):
     check_checkpoint_in_loop_findings = check_checkpoint_in_loop(tree)
     check_persistent_workers_findings = check_persistent_workers(tree)
     check_non_blocking_transfer_findings = check_non_blocking_transfer(tree)
+    check_tunable_hyperparameters_findings = check_tunable_hyperparameters(tree)
 
     all_findings += num_workers_findings
     all_findings += pin_memory_findings
@@ -259,5 +280,6 @@ def run_static_check(filepath):
     all_findings += check_checkpoint_in_loop_findings
     all_findings += check_persistent_workers_findings
     all_findings += check_non_blocking_transfer_findings
+    all_findings += check_tunable_hyperparameters_findings
     
     return all_findings
