@@ -185,6 +185,29 @@ def check_checkpoint_in_loop(tree):
                         })
     return findings
 
+def check_persistent_workers(tree):
+    """Check if persistent_workers is True"""
+
+    findings = []
+
+    for call_node in find_dataloader_calls(tree):
+        
+        # Depends on num_workers, so we need to grab this value
+        num_workers_value = literal_or_none(get_keyword_value_from_call_node(call_node, "num_workers"))
+
+        persistent_workers_node = get_keyword_value_from_call_node(call_node, "persistent_workers")
+        persistent_workers_value = literal_or_none(persistent_workers_node)
+
+        # Check if num_workers meets criteria
+        if num_workers_value is not None and num_workers_value > 0:
+            if persistent_workers_node is None or persistent_workers_value is False:
+                findings.append({
+                    "line": call_node.lineno,
+                    "message": "num_workers is greater than 0, but persistent_workers is missing or False. Worker processes will restart every epoch, adding startup overhead. Worth testing persistent_workers=True."
+                })
+    
+    return findings
+
 # Final function that ties everything together
 
 def run_static_check(filepath):
@@ -201,6 +224,7 @@ def run_static_check(filepath):
     excessive_logging_findings = check_excessive_logging(tree)
     check_gpu_cpu_sync_findings = check_gpu_cpu_sync(tree)
     check_checkpoint_in_loop_findings = check_checkpoint_in_loop(tree)
+    check_persistent_workers_findings = check_persistent_workers(tree)
 
     all_findings += num_workers_findings
     all_findings += pin_memory_findings
@@ -208,5 +232,6 @@ def run_static_check(filepath):
     all_findings += excessive_logging_findings
     all_findings += check_gpu_cpu_sync_findings
     all_findings += check_checkpoint_in_loop_findings
+    all_findings += check_persistent_workers_findings
 
     return all_findings
