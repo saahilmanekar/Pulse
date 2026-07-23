@@ -208,6 +208,30 @@ def check_persistent_workers(tree):
     
     return findings
 
+def check_non_blocking_transfer(tree):
+    """Flag .to(device)/.cuda() calls inside a loop that don't pass non_blocking=True"""
+
+    findings = []
+
+    transfer_method_names = {"to", "cuda"}
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.For, ast.While)):
+            for child in ast.walk(node):
+                if isinstance(child, ast.Call):
+                    func_name = get_call_name(child.func)
+
+                    if func_name and func_name.split(".")[-1] in transfer_method_names:
+                        non_blocking_node = get_keyword_value_from_call_node(child, "non_blocking")
+                        non_blocking_value = literal_or_none(non_blocking_node)
+
+                        if non_blocking_node is None or non_blocking_value is False:
+                            findings.append({
+                                "line": child.lineno,
+                                "message": "Tensor transfer (.to()/.cuda()) inside a loop doesn't pass non_blocking=True. If pin_memory=True is also set on your DataLoader, this can allow data transfer and GPU computation to overlap. Worth testing."
+                            })
+    return findings
+
 # Final function that ties everything together
 
 def run_static_check(filepath):
@@ -225,6 +249,7 @@ def run_static_check(filepath):
     check_gpu_cpu_sync_findings = check_gpu_cpu_sync(tree)
     check_checkpoint_in_loop_findings = check_checkpoint_in_loop(tree)
     check_persistent_workers_findings = check_persistent_workers(tree)
+    check_non_blocking_transfer_findings = check_non_blocking_transfer(tree)
 
     all_findings += num_workers_findings
     all_findings += pin_memory_findings
@@ -233,5 +258,6 @@ def run_static_check(filepath):
     all_findings += check_gpu_cpu_sync_findings
     all_findings += check_checkpoint_in_loop_findings
     all_findings += check_persistent_workers_findings
-
+    all_findings += check_non_blocking_transfer_findings
+    
     return all_findings
