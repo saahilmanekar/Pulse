@@ -77,6 +77,36 @@ def literal_or_none(node):
     except (ValueError, TypeError):
         return None
 
+def find_variable_literal_assignment(tree, var_name):
+    """Look for var_name = literal in the file"""
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+
+            # node.targets: list of nodes representing what is being assigned to left side of assignment statement 
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == var_name:
+                    value = literal_or_none(node.value)
+                    if value is not None:
+                        return value
+    return None
+
+def resolve_value(value_node, tree):
+    """Attempts to resolve a value to a literal"""
+
+    # Case 1: Direct literal (eg: num_workers=0)
+
+    literal_value = literal_or_none(value_node)
+    if literal_value is not None:
+        return literal_value, True
+
+    # Case 2: Plan local variable (eg: n=0, num_workers=n)
+
+    if isinstance(value_node, ast.Name):
+        local_value = find_variable_literal_assignment(tree, value_node.id)
+        if local_value is not None:
+            return local_value, True
+
 # Check SPECIFIC rules/attributes using the ABOVE helper functions
 
 def check_num_workers(tree):
