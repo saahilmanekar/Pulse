@@ -100,7 +100,7 @@ def resolve_value(value_node, tree):
     if literal_value is not None:
         return literal_value, True
 
-    # Case 2: Plan local variable (eg: n=0, num_workers=n)
+    # Case 2: Plain local variable (eg: n=0, num_workers=n)
 
     if isinstance(value_node, ast.Name):
         local_value = find_variable_literal_assignment(tree, value_node.id)
@@ -110,37 +110,68 @@ def resolve_value(value_node, tree):
 # Check SPECIFIC rules/attributes using the ABOVE helper functions
 
 def check_num_workers(tree):
-    """Check all DataLoader calls for a missing or zero num_workers"""
+    """Check DataLoader calls for a missing, zero, or unresolvable num_workers"""
 
     findings = []
 
     for call_node in find_dataloader_calls(tree):
-        num_workers_node = get_keyword_value_from_call_node(call_node, "num_workers")
-        num_workers_value = literal_or_none(num_workers_node)
+        value_node = get_keyword_value_from_call_node(call_node, "num_workers")
 
-        if num_workers_node is None or num_workers_value == 0:
+        # Case 1: Not set at all
+        if value_node is None:
             findings.append({
-
-                # .lineno provides the line it was written in the source file
                 "line": call_node.lineno,
-                "message": "num_workers is missing or set to 0. Data loads on a single process, which can leave the GPU waiting. Worth testing higher values (eg: 2,4,8) to see what's fastest for your specific setup."
+                "message": "num_workers is not set at all, meaning it defaults to 0. Data loads on a single process, which can leave the GPU waiting. Worth testing higher values (e.g. 2, 4, 8)."
+            })
+            continue
+
+        value, resolved = resolve_value(value_node, tree)
+
+        # Case 2: Not resolvable
+        if not resolved:
+            findings.append({
+                "line": call_node.lineno,
+                "message": "num_workers isn't a plain literal or simple variable, so Pulse can't determine or test its value. For best results, set it to a plain variable (e.g. num_workers=n, where n=0 is set nearby)."
             })
 
+        # Case 3: Resolvable
+        elif value == 0:
+            findings.append({
+                "line": call_node.lineno,
+                "message": "num_workers is set to 0. This can leave the GPU waiting. Worth testing higher values (e.g. 2, 4, 8)."
+            })
     return findings
 
 def check_pin_memory(tree):
-    """Check all DataLoader calls for a missing or False pin_memory"""
+    """Check all DataLoader calls for a missing, False, or unresolvable pin_memory"""
 
     findings = []
 
     for call_node in find_dataloader_calls(tree):
-        pin_memory_node = get_keyword_value_from_call_node(call_node, "pin_memory")
-        pin_memory_value = literal_or_none(pin_memory_node)
+        value_node = get_keyword_value_from_call_node(call_node, "pin_memory")
 
-        if pin_memory_node is None or pin_memory_value is False:
+        # Case 1: Not set at all
+        if value_node is None:
             findings.append({
                 "line": call_node.lineno,
-                "message": "pin_memory is missing or set to False. If you're using a GPU, this usually speeds up moving data from CPU to GPU at little to no cost. Worth testing pin_memory=True."
+                "message": "pin_memory is not set at all, meaning it defaults to False. If you're using a GPU, this usually speeds up moving data from CPU to GPU at little to no cost. Worth testing pin_memory=True."
+            })
+            continue
+
+        value, resolved = resolve_value(value_node, tree)
+
+        # Case 2: Not resolvable
+        if not resolved:
+            findings.append({
+                "line": call_node.lineno,
+                "message": "pin_memory isn't a plain literal or simple local variable, so Pulse can't determine or test its value. For best results, use a plain variable (e.g. use_pin = True, then pin_memory=use_pin)."
+            })
+
+        # Case 3: Resolvable
+        elif value is False:
+            findings.append({
+                "line": call_node.lineno,
+                "message": "pin_memory is set to False. If you're using a GPU, this usually speeds up moving data from CPU to GPU at little to no cost. Worth testing pin_memory=True."
             })
 
     return findings
@@ -189,7 +220,6 @@ def check_gpu_cpu_sync(tree):
             for child in ast.walk(node):
                 if isinstance(child, ast.Call):
                     func_name = get_call_name(child.func)
-                    
                     if func_name and func_name.split(".")[-1] in sync_method_names:
                         findings.append({
                             "line": child.lineno,
@@ -216,26 +246,45 @@ def check_checkpoint_in_loop(tree):
     return findings
 
 def check_persistent_workers(tree):
-    """Check if persistent_workers is True"""
+    """If num_workers > 0, check whether persistent_workers is also True"""
 
     findings = []
 
     for call_node in find_dataloader_calls(tree):
         
         # Depends on num_workers, so we need to grab this value
-        num_workers_value = literal_or_none(get_keyword_value_from_call_node(call_node, "num_workers"))
+        num_workers_node = get_keyword_value_from_call_node(call_node, "num_workers")
+        num_workers_value, num_workers_resolved = resolve_value(num_workers_node, tree)
+
+        # persistent_workers is truly beneifical if there is actual num_workers value
+        if not num_workers_resolved or num_workers_value is None or num_workers_value <= 0:
+            continue
+
 
         persistent_workers_node = get_keyword_value_from_call_node(call_node, "persistent_workers")
-        persistent_workers_value = literal_or_none(persistent_workers_node)
+        persistent_workers_value, persistent_workers_resolved = resolve_value(persistent_workers_node, tree)
 
-        # Check if num_workers meets criteria
-        if num_workers_value is not None and num_workers_value > 0:
-            if persistent_workers_node is None or persistent_workers_value is False:
-                findings.append({
-                    "line": call_node.lineno,
-                    "message": "num_workers is greater than 0, but persistent_workers is missing or False. Worker processes will restart every epoch, adding startup overhead. Worth testing persistent_workers=True."
-                })
-    
+        # Case 1: Not set at all
+        if persistent_workers_node is None:
+            findings.append({
+                "line": call_node.lineno,
+                "message": f"num_workers is {num_workers_value}, but persistent_workers is not set, so it defaults to False. Worker processes will restart every epoch, adding startup overhead. Worth testing persistent_workers=True."
+            })
+        
+        # Case 2: Not resolvable
+        elif not persistent_workers_resolved:
+            findings.append({
+                "line": call_node.lineno,
+                "message": "persistent_workers isn't a plain literal or simple local variable, so Pulse can't determine its value."
+            })
+        
+        # Case 3: Resolvable
+        elif persistent_workers_value is False:
+            findings.append({
+                "line": call_node.lineno,
+                "message": f"num_workers is {num_workers_value}, but persistent_workers is set to False. Worker processes will restart every epoch, adding startup overhead. Worth testing persistent_workers=True."
+            })
+
     return findings
 
 def check_non_blocking_transfer(tree):
@@ -262,26 +311,6 @@ def check_non_blocking_transfer(tree):
                             })
     return findings
 
-def check_tunable_hyperparameters(tree):
-    """Check whether key DataLoader settings are hardcoded"""
-
-    findings = []
-
-    keywords_to_check = {"num_workers", "batch_size", "pin_memory", "persistent_workers"}
-
-    for call_node in find_dataloader_calls(tree):
-        for keyword_name in keywords_to_check:
-            value_node = get_keyword_value_from_call_node(call_node, keyword_name)
-            value = literal_or_none(value_node)
-
-            if value_node is not None and value is not None:
-                findings.append({
-                    "line": call_node.lineno,
-                    "message": f"{keyword_name}={value} is hardcoded. Pulse can't test alternative values for this unless it's exposed as a command-line argument, eg: change this to {keyword_name}=args.{keyword_name} and add a corresponding argparse argument."
-                })
-
-    return findings
-
 # Final function that ties everything together
 
 def run_static_check(filepath):
@@ -300,7 +329,6 @@ def run_static_check(filepath):
     check_checkpoint_in_loop_findings = check_checkpoint_in_loop(tree)
     check_persistent_workers_findings = check_persistent_workers(tree)
     check_non_blocking_transfer_findings = check_non_blocking_transfer(tree)
-    check_tunable_hyperparameters_findings = check_tunable_hyperparameters(tree)
 
     all_findings += num_workers_findings
     all_findings += pin_memory_findings
@@ -310,6 +338,5 @@ def run_static_check(filepath):
     all_findings += check_checkpoint_in_loop_findings
     all_findings += check_persistent_workers_findings
     all_findings += check_non_blocking_transfer_findings
-    all_findings += check_tunable_hyperparameters_findings
     
     return all_findings
