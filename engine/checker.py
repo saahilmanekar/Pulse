@@ -306,12 +306,29 @@ def check_non_blocking_transfer(tree):
 
                     if func_name and func_name.split(".")[-1] in transfer_method_names:
                         non_blocking_node = get_keyword_value_from_call_node(child, "non_blocking")
-                        non_blocking_value = literal_or_none(non_blocking_node)
 
-                        if non_blocking_node is None or non_blocking_value is False:
+                        # Case 1: Not set at all
+                        if non_blocking_node is None:
                             findings.append({
                                 "line": child.lineno,
                                 "message": "Tensor transfer (.to()/.cuda()) inside a loop doesn't pass non_blocking=True. If pin_memory=True is also set on your DataLoader, this can allow data transfer and GPU computation to overlap. Worth testing."
+                            })
+                            continue
+
+                        non_blocking_value, resolved = resolve_value(non_blocking_node, tree)
+
+                        # Case 2: Not resolvable
+                        if not resolved:
+                            findings.append({
+                                "line": child.lineno,
+                                "message": "non_blocking isn't a plain literal or simple local variable, so Pulse can't determine its value."
+                            })
+
+                        # Case 3: Resolvable
+                        elif non_blocking_value is False:
+                            findings.append({
+                                "line": child.lineno,
+                                "message": "Tensor transfer (.to()/.cuda()) inside a loop has non_blocking=False. If pin_memory=True is also set on your DataLoader, setting non_blocking=True can allow data transfer and GPU computation to overlap. Worth testing."
                             })
     return findings
 
