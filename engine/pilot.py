@@ -36,9 +36,31 @@ def parse_pilot_output(raw_output):
 
     return steps
 
+def compute_average_timings(steps, warmup_steps=1):
+    """Skip the first `warmup_steps` steps (startup noise), then compute
+    the average of each timing field across the remaining steps"""
+
+    # Throw away the first/first few steps before computing average
+    # Running the first 10 ms for example doesn't give us valuable info
+    measured_steps = steps[warmup_steps:]
+
+    if not measured_steps:
+        return {}
+
+    # Goal is to determine which phase takes the most time on average
+    timing_fields = ["data_loading_ms", "transfer_ms", "forward_ms", "backward_ms", "optimizer_ms"]
+
+    averages = {}
+
+    # Iterate through each dictionary (step)
+    for field in timing_fields:
+        values = [step[field] for step in measured_steps]
+        averages[field] = sum(values) / len(values)
+    
+    return averages
+
 if __name__ == "__main__":
     raw_output = run_pilot("examples/toy_cnn_train.py", steps=5)
     steps = parse_pilot_output(raw_output)
-    print(steps)
-    print(f"\nNumber of steps parsed: {len(steps)}")
-    print(f"First step's data_loading_ms: {steps[0]['data_loading_ms']}")
+    averages = compute_average_timings(steps, warmup_steps=1)
+    print(averages)
