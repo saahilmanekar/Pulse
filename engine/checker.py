@@ -106,6 +106,10 @@ def resolve_value(value_node, tree):
         local_value = find_variable_literal_assignment(tree, value_node.id)
         if local_value is not None:
             return local_value, True
+    
+    # Case 3: couldn't resolve all
+
+    return None, False
 
 # Check SPECIFIC rules/attributes using the ABOVE helper functions
 
@@ -340,3 +344,8 @@ def run_static_check(filepath):
     all_findings += check_non_blocking_transfer_findings
     
     return all_findings
+
+if __name__ == "__main__": 
+    findings = run_static_check("examples/toy_cnn_train.py") 
+    for finding in findings: 
+        print(f"line {finding['line']}: {finding['message']}")
