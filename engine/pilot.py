@@ -147,6 +147,19 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
 
     return stdout, cpu_samples, memory_samples
 
+def summarize_resource_usage(cpu_samples, memory_samples):
+    """Summarize CPU and memory usage collected during a pilot run"""
+
+    if not cpu_samples or not memory_samples:
+        return None
+
+    return {
+        "avg_cpu_percent": sum(cpu_samples) / len(cpu_samples),
+        "peak_cpu_percent": max(cpu_samples),
+        "avg_memory_mb": sum(memory_samples) / len(memory_samples),
+        "peak_memory_mb": max(memory_samples),
+    }
+
 if __name__ == "__main__":
     raw_output, cpu_samples, memory_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
     dataset_info, steps = parse_pilot_output(raw_output)
@@ -155,9 +168,9 @@ if __name__ == "__main__":
     steps_per_epoch = compute_steps_per_epoch(dataset_info)
     estimated_minutes_per_epoch = estimate_full_run_time(averages, total_steps=steps_per_epoch)
     bottleneck = diagnose_bottleneck(averages)
+    resource_summary = summarize_resource_usage(cpu_samples, memory_samples)
 
     print(f"Steps per epoch: {steps_per_epoch}")
     print(f"Estimated time per epoch: {estimated_minutes_per_epoch:.2f} minutes")
     print(f"Bottleneck: {bottleneck}")
-    print(f"CPU samples: {cpu_samples}")
-    print(f"Memory samples (MB): {memory_samples}")
+    print(f"Resource usage: {resource_summary}")
