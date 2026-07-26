@@ -8,6 +8,9 @@ import sys
 # JSON is common text format used to store and send structured data
 import json
 
+# Math module has many built-in mathematical functions
+import math
+
 def run_pilot(filepath, steps=20):
     """Launch training script as subprocess for limited number of steps"""
 
@@ -79,8 +82,25 @@ def estimate_full_run_time(averages, total_steps):
 
     return total_time_minutes
 
+def compute_steps_per_epoch(dataset_info):
+    """Given dataset_info (with dataset_size and batch_size), compute
+    how many steps (batches) make up one full epoch)"""
+
+    if dataset_info is None:
+        return None
+    
+    dataset_size = dataset_info["dataset_size"]
+    batch_size = dataset_info["batch_size"]
+
+    return math.ceil(dataset_size / batch_size)
+
 if __name__ == "__main__":
     raw_output = run_pilot("examples/toy_cnn_train.py", steps=5)
     dataset_info, steps = parse_pilot_output(raw_output)
-    print("Dataset info:", dataset_info)
-    print("Steps:", steps)
+    averages = compute_average_timings(steps, warmup_steps=1)
+
+    steps_per_epoch = compute_steps_per_epoch(dataset_info)
+    estimated_minutes_per_epoch = estimate_full_run_time(averages, total_steps=steps_per_epoch)
+
+    print(f"Steps per epoch: {steps_per_epoch}")
+    print(f"Estimated time per epoch: {estimated_minutes_per_epoch:.2f} minutes")
