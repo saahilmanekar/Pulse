@@ -11,6 +11,9 @@ import json
 # Math module has many built-in mathematical functions
 import math
 
+# Used to get information about your computer’s running processes and system resources
+import psutil
+
 def run_pilot(filepath, steps=20):
     """Launch training script as subprocess for limited number of steps"""
 
@@ -120,10 +123,42 @@ def diagnose_bottleneck(averages, threshold=0.4):
     else:
         return None
 
-if __name__ == "__main__":
-    raw_output = run_pilot("examples/toy_cnn_train.py", steps=5)
-    dataset_info, steps = parse_pilot_output(raw_output)
-    averages = compute_average_timings(steps, warmup_steps=1)
+def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
+    """Launch a training script as a subprocess, and periodically sample
+    its CPU and memory usage while it runs"""
 
-    bottleneck = diagnose_bottleneck(averages)
-    print("Bottleneck:", bottleneck)
+    process = subprocess.Popen(
+        [sys.executable, filepath, "--steps", str(steps)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+
+    # psutil.Process lets us query stats about a specific running process,
+    # given its process ID (process.pid, provided automatically by Popen)
+    ps_process = psutil.Process(process.pid)
+
+    cpu_samples = []
+    memory_samples = []
+
+    # None means "still running"
+    while process.poll() is None:  
+        try:
+            cpu_percent = ps_process.cpu_percent(interval=poll_interval)
+            memory_mb = ps_process.memory_info().rss / (1024 * 1024)
+
+            cpu_samples.append(cpu_percent)
+            memory_samples.append(memory_mb)
+        except psutil.NoSuchProcess:
+
+            # process finished between our checks
+            break  
+
+    stdout, stderr = process.communicate()
+
+    return stdout, cpu_samples, memory_samples
+
+if __name__ == "__main__":
+    stdout, cpu_samples, memory_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
+    print("CPU samples:", cpu_samples)
+    print("Memory samples (MB):", memory_samples)
