@@ -59,8 +59,26 @@ def compute_average_timings(steps, warmup_steps=1):
     
     return averages
 
+def compute_total_step_time(averages):
+    """Sum all phase averages into one total average time per step (ms)"""
+
+    return sum(averages.values())
+
+def estimate_full_run_time(averages, total_steps):
+    """Estimate total training time (in minutes) given the average
+    per-step time and how many steps the full run will take"""
+
+    total_step_time_ms = compute_total_step_time(averages)
+    total_time_ms = total_step_time_ms * total_steps
+    total_time_minutes = total_time_ms / 1000 / 60
+
+    return total_time_minutes
+
 if __name__ == "__main__":
     raw_output = run_pilot("examples/toy_cnn_train.py", steps=5)
     steps = parse_pilot_output(raw_output)
     averages = compute_average_timings(steps, warmup_steps=1)
-    print(averages)
+
+    # example: pretend a full run is 10,000 steps
+    estimated_minutes = estimate_full_run_time(averages, total_steps=10000)
+    print(f"Estimated full run time: {estimated_minutes:.2f} minutes")
