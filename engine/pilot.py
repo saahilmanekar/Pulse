@@ -160,6 +160,31 @@ def summarize_resource_usage(cpu_samples, memory_samples):
         "peak_memory_mb": max(memory_samples),
     }
 
+def print_pilot_report(dataset_info, averages, bottleneck, resource_summary, estimated_minutes_per_epoch):
+    """Print clean, readable summary of a pilot run's findings"""
+
+    print("\nPulse Pilot Run Report")
+    print("=" * 50)
+
+    if dataset_info:
+        print(f"Dataset size: {dataset_info['dataset_size']}, Batch size: {dataset_info['batch_size']}")
+
+    print(f"\nEstimated time per epoch: {estimated_minutes_per_epoch:.2f} minutes")
+
+    print("\nAverage time per phase (ms):")
+    for phase, avg_time in averages.items():
+        print(f"  {phase}: {avg_time:.2f}")
+
+    if bottleneck:
+        print(f"\nBottleneck detected: {bottleneck['phase']} ({bottleneck['fraction']*100:.1f}% of step time)")
+    else:
+        print("\nNo dominant bottleneck detected, timing looks fairly balanced.")
+
+    if resource_summary:
+        print(f"\nResource usage during pilot run:")
+        print(f"  CPU: avg {resource_summary['avg_cpu_percent']:.1f}%, peak {resource_summary['peak_cpu_percent']:.1f}%")
+        print(f"  Memory: avg {resource_summary['avg_memory_mb']:.1f} MB, peak {resource_summary['peak_memory_mb']:.1f} MB")
+
 if __name__ == "__main__":
     raw_output, cpu_samples, memory_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
     dataset_info, steps = parse_pilot_output(raw_output)
@@ -170,7 +195,4 @@ if __name__ == "__main__":
     bottleneck = diagnose_bottleneck(averages)
     resource_summary = summarize_resource_usage(cpu_samples, memory_samples)
 
-    print(f"Steps per epoch: {steps_per_epoch}")
-    print(f"Estimated time per epoch: {estimated_minutes_per_epoch:.2f} minutes")
-    print(f"Bottleneck: {bottleneck}")
-    print(f"Resource usage: {resource_summary}")
+    print_pilot_report(dataset_info, averages, bottleneck, resource_summary, estimated_minutes_per_epoch)
