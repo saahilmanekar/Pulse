@@ -81,6 +81,10 @@ def main():
         pin_memory=torch.cuda.is_available(),
     )
 
+    # Report dataset info once, before training starts -- separate from
+    # per-step timing lines, distinguished by the "type" key
+    print(json.dumps({"type": "dataset_info", "dataset_size": len(dataset), "batch_size": args.batch_size}), flush=True)
+
     model = TinyCNN().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.CrossEntropyLoss()

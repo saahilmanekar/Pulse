@@ -31,10 +31,15 @@ def parse_pilot_output(raw_output):
         if line.strip():
 
             # Takes the string and converts it into normal Python data
-            step_data = json.loads(line)
-            steps.append(step_data)
+            data = json.loads(line)
 
-    return steps
+            # Extract dataset info
+            if data.get("type") == "dataset_info":
+                dataset_info = data
+            else:
+                steps.append(data)
+
+    return dataset_info, steps
 
 def compute_average_timings(steps, warmup_steps=1):
     """Skip the first `warmup_steps` steps (startup noise), then compute
@@ -76,9 +81,6 @@ def estimate_full_run_time(averages, total_steps):
 
 if __name__ == "__main__":
     raw_output = run_pilot("examples/toy_cnn_train.py", steps=5)
-    steps = parse_pilot_output(raw_output)
-    averages = compute_average_timings(steps, warmup_steps=1)
-
-    # example: pretend a full run is 10,000 steps
-    estimated_minutes = estimate_full_run_time(averages, total_steps=10000)
-    print(f"Estimated full run time: {estimated_minutes:.2f} minutes")
+    dataset_info, steps = parse_pilot_output(raw_output)
+    print("Dataset info:", dataset_info)
+    print("Steps:", steps)
