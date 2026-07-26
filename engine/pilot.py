@@ -94,13 +94,36 @@ def compute_steps_per_epoch(dataset_info):
 
     return math.ceil(dataset_size / batch_size)
 
+def diagnose_bottleneck(averages, threshold=0.4):
+    """Given average per-phase timings identify which phase (if any)
+    takes up more than `threshold` fraction of total step time"""
+
+    total_time = compute_total_step_time(averages)
+
+    if total_time == 0:
+        return None
+
+    bottleneck = None
+    highest_fraction = 0
+
+    for phase, avg_time in averages.items():
+        fraction = avg_time / total_time
+
+        # Find largest fraction
+        if fraction > highest_fraction:
+            highest_fraction = fraction
+            bottleneck = phase
+
+    # Needs to be larger than threshold
+    if highest_fraction >= threshold:
+        return {"phase": bottleneck, "fraction": highest_fraction}
+    else:
+        return None
+
 if __name__ == "__main__":
     raw_output = run_pilot("examples/toy_cnn_train.py", steps=5)
     dataset_info, steps = parse_pilot_output(raw_output)
     averages = compute_average_timings(steps, warmup_steps=1)
 
-    steps_per_epoch = compute_steps_per_epoch(dataset_info)
-    estimated_minutes_per_epoch = estimate_full_run_time(averages, total_steps=steps_per_epoch)
-
-    print(f"Steps per epoch: {steps_per_epoch}")
-    print(f"Estimated time per epoch: {estimated_minutes_per_epoch:.2f} minutes")
+    bottleneck = diagnose_bottleneck(averages)
+    print("Bottleneck:", bottleneck)
