@@ -14,17 +14,6 @@ import math
 # Used to get information about your computer’s running processes and system resources
 import psutil
 
-def run_pilot(filepath, steps=20):
-    """Launch training script as subprocess for limited number of steps"""
-
-    result = subprocess.run(
-        [sys.executable, filepath, "--steps", str(steps)],
-        capture_output=True,
-        text=True
-    )
-
-    return result.stdout
-
 def parse_pilot_output(raw_output):
     """Turn raw stdout text (1 JSON line per step) into a list of real Python
     dictionaries"""
@@ -151,7 +140,7 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
             memory_samples.append(memory_mb)
         except psutil.NoSuchProcess:
 
-            # process finished between our checks
+            # process finished between our check
             break  
 
     stdout, stderr = process.communicate()
@@ -159,6 +148,16 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
     return stdout, cpu_samples, memory_samples
 
 if __name__ == "__main__":
-    stdout, cpu_samples, memory_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
-    print("CPU samples:", cpu_samples)
-    print("Memory samples (MB):", memory_samples)
+    raw_output, cpu_samples, memory_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
+    dataset_info, steps = parse_pilot_output(raw_output)
+    averages = compute_average_timings(steps, warmup_steps=1)
+
+    steps_per_epoch = compute_steps_per_epoch(dataset_info)
+    estimated_minutes_per_epoch = estimate_full_run_time(averages, total_steps=steps_per_epoch)
+    bottleneck = diagnose_bottleneck(averages)
+
+    print(f"Steps per epoch: {steps_per_epoch}")
+    print(f"Estimated time per epoch: {estimated_minutes_per_epoch:.2f} minutes")
+    print(f"Bottleneck: {bottleneck}")
+    print(f"CPU samples: {cpu_samples}")
+    print(f"Memory samples (MB): {memory_samples}")
