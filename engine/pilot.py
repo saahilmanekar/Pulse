@@ -14,6 +14,18 @@ import math
 # Used to get information about your computer’s running processes and system resources
 import psutil
 
+# Loads Python’s interface to NVIDIA Management Library (NVML)
+# Lets program ask NVIDIA GPU for information such as: GPU utilization, GPU memory usage, power usage, etc
+import pynvml
+
+# Attempts to start and initialize NVIDIA’s GPU-monitoring library so your program 
+# can communicate with the NVIDIA driver and inspect the GPUs
+try:
+    pynvml.nvmlInit()
+    GPU_AVAILABLE = True
+except Exception:
+    GPU_AVAILABLE = False
+
 def parse_pilot_output(raw_output):
     """Turn raw stdout text (1 JSON line per step) into a list of real Python
     dictionaries"""
@@ -184,6 +196,23 @@ def print_pilot_report(dataset_info, averages, bottleneck, resource_summary, est
         print(f"\nResource usage during pilot run:")
         print(f"  CPU: avg {resource_summary['avg_cpu_percent']:.1f}%, peak {resource_summary['peak_cpu_percent']:.1f}%")
         print(f"  Memory: avg {resource_summary['avg_memory_mb']:.1f} MB, peak {resource_summary['peak_memory_mb']:.1f} MB")
+    
+def get_gpu_stats():
+    """Get current GPU utilization % and memory usage, for one moment in time"""
+
+    # Returns None if no NVIDIA GPU is available (eg: running on a Mac)
+    if not GPU_AVAILABLE:
+        return None
+
+    handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+    utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
+    memory = pynvml.nvmlDeviceGetMemoryInfo(handle)
+
+    return {
+        "gpu_percent": utilization.gpu,
+        "gpu_memory_used_mb": memory.used / (1024 * 1024),
+        "gpu_memory_total_mb": memory.total / (1024 * 1024),
+    }
 
 if __name__ == "__main__":
     raw_output, cpu_samples, memory_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
