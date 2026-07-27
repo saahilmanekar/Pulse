@@ -124,9 +124,14 @@ def diagnose_bottleneck(averages, threshold=0.4):
     else:
         return None
 
-def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.01):
+def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.01, extra_args=None):
     """Launch a training script as a subprocess, and periodically sample
     its CPU, memory, and GPU usage while it runs"""
+
+    # In case for --artificial-delay, etc we have extra_args
+    command = [sys.executable, filepath, "--steps", str(steps)]
+    if extra_args:
+        command += extra_args
 
     process = subprocess.Popen(
         [sys.executable, filepath, "--steps", str(steps)],
