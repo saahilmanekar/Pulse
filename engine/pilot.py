@@ -126,7 +126,7 @@ def diagnose_bottleneck(averages, threshold=0.4):
 
 def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
     """Launch a training script as a subprocess, and periodically sample
-    its CPU and memory usage while it runs"""
+    its CPU, memory, and GPU usage while it runs"""
 
     process = subprocess.Popen(
         [sys.executable, filepath, "--steps", str(steps)],
@@ -141,6 +141,7 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
 
     cpu_samples = []
     memory_samples = []
+    gpu_samples = []
 
     # None means "still running"
     while process.poll() is None:  
@@ -150,6 +151,11 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
 
             cpu_samples.append(cpu_percent)
             memory_samples.append(memory_mb)
+
+            gpu_stats = get_gpu_stats()
+            if gpu_stats is not None:
+                gpu_samples.append(gpu_stats)
+
         except psutil.NoSuchProcess:
 
             # process finished between our check
@@ -157,7 +163,7 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
 
     stdout, stderr = process.communicate()
 
-    return stdout, cpu_samples, memory_samples
+    return stdout, cpu_samples, memory_samples, gpu_samples
 
 def summarize_resource_usage(cpu_samples, memory_samples):
     """Summarize CPU and memory usage collected during a pilot run"""
@@ -215,7 +221,7 @@ def get_gpu_stats():
     }
 
 if __name__ == "__main__":
-    raw_output, cpu_samples, memory_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
+    raw_output, cpu_samples, memory_samples, gpu_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
     dataset_info, steps = parse_pilot_output(raw_output)
     averages = compute_average_timings(steps, warmup_steps=1)
 
