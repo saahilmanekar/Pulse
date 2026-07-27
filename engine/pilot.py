@@ -165,18 +165,29 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.01):
 
     return stdout, cpu_samples, memory_samples, gpu_samples
 
-def summarize_resource_usage(cpu_samples, memory_samples):
-    """Summarize CPU and memory usage collected during a pilot run"""
+def summarize_resource_usage(cpu_samples, memory_samples, gpu_samples = None):
+    """Summarize CPU, memory, and optionally GPU usage collected during a pilot run"""
 
     if not cpu_samples or not memory_samples:
         return None
 
-    return {
+    summary = {
         "avg_cpu_percent": sum(cpu_samples) / len(cpu_samples),
         "peak_cpu_percent": max(cpu_samples),
         "avg_memory_mb": sum(memory_samples) / len(memory_samples),
         "peak_memory_mb": max(memory_samples),
     }
+
+    if gpu_samples:
+        gpu_percents = [g["gpu_percent"] for g in gpu_samples]
+        gpu_memory_used = [g["gpu_memory_used_mb"] for g in gpu_samples]
+
+        summary["avg_gpu_percent"] = sum(gpu_percents) / len(gpu_percents)
+        summary["peak_gpu_percent"] = max(gpu_percents)
+        summary["avg_gpu_memory_mb"] = sum(gpu_memory_used) / len(gpu_memory_used)
+        summary["peak_gpu_memory_mb"] = max(gpu_memory_used)
+
+    return summary
 
 def print_pilot_report(dataset_info, averages, bottleneck, resource_summary, estimated_minutes_per_epoch):
     """Print clean, readable summary of a pilot run's findings"""
@@ -202,6 +213,10 @@ def print_pilot_report(dataset_info, averages, bottleneck, resource_summary, est
         print(f"\nResource usage during pilot run:")
         print(f"  CPU: avg {resource_summary['avg_cpu_percent']:.1f}%, peak {resource_summary['peak_cpu_percent']:.1f}%")
         print(f"  Memory: avg {resource_summary['avg_memory_mb']:.1f} MB, peak {resource_summary['peak_memory_mb']:.1f} MB")
+
+        if "avg_gpu_percent" in resource_summary:
+            print(f"  GPU: avg {resource_summary['avg_gpu_percent']:.1f}%, peak {resource_summary['peak_gpu_percent']:.1f}%")
+            print(f"  GPU Memory: avg {resource_summary['avg_gpu_memory_mb']:.1f} MB, peak {resource_summary['peak_gpu_memory_mb']:.1f} MB")
     
 def get_gpu_stats():
     """Get current GPU utilization % and memory usage, for one moment in time"""
@@ -228,6 +243,6 @@ if __name__ == "__main__":
     steps_per_epoch = compute_steps_per_epoch(dataset_info)
     estimated_minutes_per_epoch = estimate_full_run_time(averages, total_steps=steps_per_epoch)
     bottleneck = diagnose_bottleneck(averages)
-    resource_summary = summarize_resource_usage(cpu_samples, memory_samples)
+    resource_summary = summarize_resource_usage(cpu_samples, memory_samples, gpu_samples)
 
     print_pilot_report(dataset_info, averages, bottleneck, resource_summary, estimated_minutes_per_epoch)
