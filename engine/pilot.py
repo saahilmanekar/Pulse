@@ -124,7 +124,7 @@ def diagnose_bottleneck(averages, threshold=0.4):
     else:
         return None
 
-def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.2):
+def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.1):
     """Launch a training script as a subprocess, and periodically sample
     its CPU, memory, and GPU usage while it runs"""
 
