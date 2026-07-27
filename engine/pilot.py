@@ -239,15 +239,3 @@ def get_gpu_stats():
         "gpu_memory_used_mb": memory.used / (1024 * 1024),
         "gpu_memory_total_mb": memory.total / (1024 * 1024),
     }
-
-if __name__ == "__main__":
-    raw_output, cpu_samples, memory_samples, gpu_samples = run_pilot_with_monitoring("examples/toy_cnn_train.py", steps=20)
-    dataset_info, steps = parse_pilot_output(raw_output)
-    averages = compute_average_timings(steps, warmup_steps=1)
-
-    steps_per_epoch = compute_steps_per_epoch(dataset_info)
-    estimated_minutes_per_epoch = estimate_full_run_time(averages, total_steps=steps_per_epoch)
-    bottleneck = diagnose_bottleneck(averages)
-    resource_summary = summarize_resource_usage(cpu_samples, memory_samples, gpu_samples)
-
-    print_pilot_report(dataset_info, averages, bottleneck, resource_summary, estimated_minutes_per_epoch)
