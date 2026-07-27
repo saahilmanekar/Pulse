@@ -72,6 +72,7 @@ def parse_args():
 def main():
     args = parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(json.dumps({"type": "device_info", "device": str(device)}), flush=True)
 
     dataset = FakeImageDataset(artificial_delay=args.artificial_delay)
     loader = DataLoader(
