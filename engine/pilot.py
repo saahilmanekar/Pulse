@@ -134,7 +134,7 @@ def run_pilot_with_monitoring(filepath, steps=20, poll_interval=0.01, extra_args
         command += extra_args
 
     process = subprocess.Popen(
-        [sys.executable, filepath, "--steps", str(steps)],
+        command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True
