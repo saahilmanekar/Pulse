@@ -1,7 +1,7 @@
 from checker import run_static_check
 from pilot import run_pilot_with_monitoring, parse_pilot_output, compute_average_timings, diagnose_bottleneck
 
-def gather_findings(filepath, steps=20):
+def gather_findings(filepath, steps=20, extra_args=None):
     """Run both the static checker and a pilot run on the same script
     and return their raw findings together"""
 
@@ -9,7 +9,7 @@ def gather_findings(filepath, steps=20):
     static_findings = run_static_check(filepath)
 
     # Gather pilot findings
-    raw_output, cpu_samples, memory_samples, gpu_samples = run_pilot_with_monitoring(filepath, steps=steps)
+    raw_output, cpu_samples, memory_samples, gpu_samples = run_pilot_with_monitoring(filepath, steps=steps, extra_args=extra_args)
     dataset_info, pilot_steps = parse_pilot_output(raw_output)
     averages = compute_average_timings(pilot_steps, warmup_steps=1)
     bottleneck = diagnose_bottleneck(averages)
