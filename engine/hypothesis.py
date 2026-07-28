@@ -62,3 +62,30 @@ def build_hypothesis(static_findings, bottleneck):
             "confidence": "medium",
             "summary": f"{phase} is the measured bottleneck ({bottleneck['fraction']*100:.1f}% of step time), but no related static findings were found. This may be a compute-bound limitation (eg: backward pass) rather than a configuration issue Pulse can currently detect.",
         }
+
+def print_hypothesis_report(static_findings, bottleneck, hypothesis):
+    """Print a clean, readable combined report from the static checker
+    and the pilot run's bottleneck diagnosis."""
+
+    print("\nPulse Hypothesis Report")
+    print("=" * 50)
+
+    print(f"\nStatic findings ({len(static_findings)}):")
+    if static_findings:
+        for finding in static_findings:
+            print(f"  line {finding['line']}: {finding['message']}")
+    else:
+        print("  None found.")
+
+    if bottleneck:
+        print(f"\nMeasured bottleneck: {bottleneck['phase']} ({bottleneck['fraction']*100:.1f}% of step time)")
+    else:
+        print("\nNo dominant bottleneck measured, timing looks fairly balanced.")
+
+    print(f"\nHypothesis ({hypothesis['confidence']} confidence):")
+    print(f"  {hypothesis['summary']}")
+
+    if hypothesis.get("related_findings"):
+        print("\n  Related static findings supporting this hypothesis:")
+        for finding in hypothesis["related_findings"]:
+            print(f"    line {finding['line']}: {finding['message']}")
