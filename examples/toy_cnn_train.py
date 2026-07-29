@@ -61,6 +61,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--persistent-workers", type=lambda v: str(v).lower() == "true", default=False)
     parser.add_argument("--amp", type=lambda v: str(v).lower() == "true", default=False)
     parser.add_argument("--steps", type=int, default=100,
                          help="Number of training steps to run (used for short pilot runs)")
@@ -80,6 +81,7 @@ def main():
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=torch.cuda.is_available(),
+        persistent_workers=args.persistent_workers if args.num_workers > 0 else False,
     )
 
     # Report dataset info once, before training starts -- separate from
