@@ -41,22 +41,3 @@ def compare_candidates(filepath, flag_name, candidate_values, steps, fixed_args=
 
     results.sort(key=lambda r: r["total_step_time_ms"])
     return results
-
-import time
-
-if __name__ == "__main__":
-    steps = get_reliable_step_count("examples/toy_cnn_train.py")
-    print(f"Using {steps} steps per candidate test\n")
-
-    t0 = time.time()
-    results = compare_candidates(
-        "examples/toy_cnn_train.py", "--num-workers", [0, 2, 4, 8],
-        steps=steps,
-        fixed_args=["--persistent-workers", "true", "--artificial-delay", "0.01"]
-    )
-    elapsed = time.time() - t0
-
-    for r in results:
-        print(f"num_workers={r['flag_value']}: {r['total_step_time_ms']:.2f}ms/step")
-
-    print(f"\nTotal time to test all candidates: {elapsed:.2f}s")
