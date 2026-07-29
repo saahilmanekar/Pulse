@@ -1,6 +1,16 @@
-from pilot import run_pilot_with_monitoring, parse_pilot_output, compute_average_timings, compute_total_step_time
+from pilot import run_pilot_with_monitoring, parse_pilot_output, compute_average_timings, compute_total_step_time, compute_steps_per_epoch
 
-def test_candidate(filepath, flag_name, flag_value, steps=20):
+def get_reliable_step_count(filepath, min_epochs_to_test=1.2):
+    """Run a tiny baseline pass just to learn the dataset size, then
+    compute a step count that reliably crosses at least 1 epoch boundary"""
+
+    raw_output, cpu_samples, memory_samples, gpu_samples = run_pilot_with_monitoring(filepath, steps=1)
+    dataset_info, pilot_steps = parse_pilot_output(raw_output)
+
+    steps_per_epoch = compute_steps_per_epoch(dataset_info)
+    return int(steps_per_epoch * min_epochs_to_test)
+
+def test_candidate(filepath, flag_name, flag_value, steps):
     """Run the pilot with one specific candidate setting, and return
     its measured average total step time (ms)"""
 
